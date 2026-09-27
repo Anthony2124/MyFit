@@ -1,14 +1,27 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { MOOD_LABELS } from '../lib/types'
+import { useToast } from './Toast'
 
-const TAGS = ['work', 'family', 'friends', 'exercise', 'sleep', 'health', 'stress', 'grateful', 'anxious', 'calm']
+const TAGS = ['work', 'family', 'friends', 'exercise', 'sleep', 'health', 'stress', 'grateful', 'anxious', 'calm', 'outdoors', 'social']
 
-export default function MoodForm({ onSaved, compact = false }: { onSaved?: () => void; compact?: boolean }) {
+const PROMPTS = [
+  'What’s one thing that went well today?',
+  'What’s taking up the most space in your mind?',
+  'What are you grateful for right now?',
+  'What would make tomorrow a little easier?',
+  'What drained your energy today? What restored it?',
+]
+
+export default function MoodForm({ onSaved, compact = false, extraTags = [] }: { onSaved?: () => void; compact?: boolean; extraTags?: string[] }) {
+  const toast = useToast()
   const [mood, setMood] = useState<number | null>(null)
   const [energy, setEnergy] = useState<number | null>(null)
   const [tags, setTags] = useState<string[]>([])
+  const [custom, setCustom] = useState('')
   const [note, setNote] = useState('')
+  const [prompt, setPrompt] = useState(() => PROMPTS[Math.floor(Math.random() * PROMPTS.length)])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,10 +37,19 @@ export default function MoodForm({ onSaved, compact = false }: { onSaved?: () =>
     setTags([])
     setNote('')
     setError(null)
+    toast('Check-in saved')
     onSaved?.()
   }
 
   const toggleTag = (t: string) => setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
+
+  function addCustom() {
+    const t = custom.trim().toLowerCase().slice(0, 24)
+    if (t && !tags.includes(t)) setTags((prev) => [...prev, t])
+    setCustom('')
+  }
+
+  const tagOptions = [...new Set([...TAGS, ...extraTags, ...tags])]
 
   return (
     <form onSubmit={save} className="card stack">
@@ -57,11 +79,31 @@ export default function MoodForm({ onSaved, compact = false }: { onSaved?: () =>
             <span className="muted">{energy ?? '—'}</span>
           </label>
           <div className="row wrap">
-            {TAGS.map((t) => (
+            {tagOptions.map((t) => (
               <button type="button" key={t} className={`chip ${tags.includes(t) ? 'on' : ''}`} onClick={() => toggleTag(t)}>
                 {t}
               </button>
             ))}
+            <input
+              className="chip-input"
+              placeholder="+ tag"
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addCustom()
+                }
+              }}
+              onBlur={addCustom}
+              aria-label="Add a custom tag"
+            />
+          </div>
+          <div className="row between small">
+            <span className="muted">Prompt: {prompt}</span>
+            <button type="button" className="link small" onClick={() => setPrompt(PROMPTS[(PROMPTS.indexOf(prompt) + 1) % PROMPTS.length])}>
+              Another
+            </button>
           </div>
           <textarea placeholder="Anything on your mind? (private)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={5000} rows={3} />
         </>
@@ -73,7 +115,7 @@ export default function MoodForm({ onSaved, compact = false }: { onSaved?: () =>
           <a href="https://findahelpline.com" target="_blank" rel="noreferrer">
             findahelpline.com
           </a>
-          .
+          . A <Link to="/calm">short breathing exercise</Link> might also help.
         </p>
       )}
       {error && <p className="notice error">{error}</p>}

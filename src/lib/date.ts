@@ -41,3 +41,47 @@ export function daysAgo(n: number): string {
   d.setDate(d.getDate() - n)
   return toDateKey(d)
 }
+
+export function parseKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+/** e.g. "Mon, Sep 28" */
+export function prettyDate(key: string): string {
+  return parseKey(key).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+/** Longest run of consecutive days anywhere in the set. */
+export function longestStreak(dates: Set<string>): number {
+  let best = 0
+  for (const key of dates) {
+    const prev = parseKey(key)
+    prev.setDate(prev.getDate() - 1)
+    if (dates.has(toDateKey(prev))) continue // not the start of a run
+    let len = 0
+    const d = parseKey(key)
+    while (dates.has(toDateKey(d))) {
+      len++
+      d.setDate(d.getDate() + 1)
+    }
+    best = Math.max(best, len)
+  }
+  return best
+}
+
+/** Date key of the Monday starting the week that contains `key`. */
+export function weekStart(key: string = toDateKey()): string {
+  const d = parseKey(key)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return toDateKey(d)
+}
+
+/** Hours between a bedtime and wake time given as "HH:MM", wrapping past midnight. */
+export function hoursBetween(bed: string, wake: string): number {
+  const [bh, bm] = bed.split(':').map(Number)
+  const [wh, wm] = wake.split(':').map(Number)
+  let mins = wh * 60 + wm - (bh * 60 + bm)
+  if (mins <= 0) mins += 24 * 60
+  return Math.round((mins / 60) * 4) / 4
+}
