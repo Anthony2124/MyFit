@@ -5,22 +5,34 @@ import { supabase } from '../lib/supabase'
 interface AuthState {
   session: Session | null
   loading: boolean
+  /** True after the user follows a password-reset link, until they set a new password. */
+  recovering: boolean
+  finishRecovery: () => void
 }
 
-const AuthContext = createContext<AuthState>({ session: null, loading: true })
+const AuthContext = createContext<AuthState>({ session: null, loading: true, recovering: false, finishRecovery: () => {} })
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({ session: null, loading: true })
+  const [session, setSession] = useState<Session | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setState({ session: data.session, loading: false }))
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) =>
-      setState({ session, loading: false }),
-    )
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setLoading(false)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+      setSession(session)
+      setLoading(false)
+    })
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  return <AuthContext.Provider value={state}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ session, loading, recovering, finishRecovery: () => setRecovering(false) }}>{children}</AuthContext.Provider>
+  )
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
